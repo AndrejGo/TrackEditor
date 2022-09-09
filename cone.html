@@ -22,7 +22,7 @@
 
 <body style="margin: 0px; overflow: hidden;">
     <div class="row container-fluid m-0 p-0"
-        style="width: 100vw; height: 70px; background: linear-gradient(90deg, rgba(70, 70, 70, 0.25) 8%, rgba(0, 0, 0, 0.75) 92%), url('images/AMZ_carbon.png') repeat #333333;">
+        style="width: 100vw; height: 70px; background: linear-gradient(270deg, rgba(70, 70, 70, 0.25) 8%, rgba(0, 0, 0, 0.75) 92%), url('images/AMZ_carbon.png') repeat #333333;">
         <img src="images/AMZ_Logo.png" style="width: auto; height: 50px; margin: 10px;" />
     </div>
     <div style="height: 5px; background: linear-gradient(90deg, #D20A11 8%, #A00000 92%);"></div>
@@ -31,9 +31,17 @@
 
             <div class="row">
                 <div class="col-2 minw-200 card card-body m-2 p-2">
-                    <button type="button" class="btn btn-outline-secondary mb-2">Center grid</button>
-                    <button type="button" class="btn btn-outline-secondary mb-2">Noisy cones</button>
-                    <button type="button" class="btn btn-outline-danger mb-2">Clear track</button>
+                    <div>
+                        <button type="button" class="btn btn-outline-secondary mb-2" onclick="undo()"
+                            style="width: calc(50% - 2px);">Undo</button>
+                        <button type="button" class="btn btn-outline-secondary mb-2" onclick="undo()"
+                            style="width: calc(50% - 2px);">Redo</button>
+                    </div>
+                    <button id="noisy-cone-btn" type="button" class="btn btn-outline-secondary mb-2"
+                        onclick="toggleNoisyCones()">Noisy
+                        cones</button>
+                    <button type="button" class="btn btn-outline-danger mb-2" onclick="clearTrack()">Clear
+                        track</button>
                     <button type="button" class="btn btn-outline-success mb-2">Export track</button>
                 </div>
 

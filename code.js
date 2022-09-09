@@ -23,12 +23,16 @@ const originRadius = 6;
 var worldContainer;
 var pathSegments;
 var potentialPathSegment;
+var noisyBlueCones;
+var noisyYellowCones;
 var endOfTrack;
 var endOfTrackMarker;
 var activelyDrawing = true;
 
 var conesGraphics;
 var arcsGraphics;
+
+var needToRedraw = false;
 
 // ============================================================================================== //
 // Entry point to the JS code
@@ -122,6 +126,28 @@ function appLoop() {
         // possible (radius and length are large enough).
         if (!potentialPathSegment.invalid) {
             pathSegments.push(potentialPathSegment);
+
+            if (drawNoisyCones) {
+                let blueCones = potentialPathSegment.blueCones;
+                for (j = 0; j < blueCones.length; j++) {
+                    noisyBlueCones.push(addNoiseToPoint(blueCones[j]));
+                }
+
+                let yellowCones = potentialPathSegment.yellowCones;
+                for (j = 0; j < yellowCones.length; j++) {
+                    noisyYellowCones.push(addNoiseToPoint(yellowCones[j]));
+                }
+            } else {
+                let blueCones = potentialPathSegment.blueCones;
+                for (j = 0; j < blueCones.length; j++) {
+                    noisyBlueCones.push(blueCones[j]);
+                }
+
+                let yellowCones = potentialPathSegment.yellowCones;
+                for (j = 0; j < yellowCones.length; j++) {
+                    noisyYellowCones.push(yellowCones[j]);
+                }
+            }
         }
 
         // If the user clicked within 40 pixels of endOfTrack, we know their pointer was snapped to
@@ -137,9 +163,11 @@ function appLoop() {
     }
 
     // Draw the cones and the arcs that make up the track every tick.
-    drawCones(pathSegments, potentialPathSegment);
-    drawArcs(pathSegments, potentialPathSegment);
-
+    if (activelyDrawing || needToRedraw) {
+        needToRedraw = false;
+        drawCones(pathSegments, potentialPathSegment);
+        drawArcs(pathSegments, potentialPathSegment);
+    }
 }
 
 // ============================================================================================== //
@@ -186,6 +214,8 @@ function setUpWorld() {
      */
     document.getElementById("canvas-wrapper").addEventListener("wheel", function (e) {
         e.preventDefault();
+
+        needToRedraw = true;
 
         // We "zoom" by increasing or decreasing the scale factor of worldContainer. We decrease
         // it by multiplying with 0.9 and increase it by multiplying it with 1/0.9. We choose the
@@ -290,6 +320,8 @@ function setUpStart() {
     // Clear the pathSegments array, which contains all of the path segments that the user draws.
     // We use it to support undo's and to store cone positions.
     pathSegments = [];
+    noisyBlueCones = [];
+    noisyYellowCones = [];
 
     // Create the initial path segment which runs through the center of the start/finish line, in
     // a north south direction from 1 m before the line to 1 m after the line.
@@ -546,15 +578,13 @@ function drawCones(pathSegments, potentialPathSegment) {
     conesGraphics.clear();
 
     // Draw cones of the segments that were already placed.
-    for (i = 0; i < pathSegments.length; i++) {
-        for (j = 0; j < pathSegments[i].blueCones.length; j++) {
-            let conePosition = pathSegments[i].blueCones[j];
-            drawCone(conePosition.x, conePosition.y, colorBlue, scaledConeRadius);
-        }
-        for (j = 0; j < pathSegments[i].yellowCones.length; j++) {
-            let conePosition = pathSegments[i].yellowCones[j];
-            drawCone(conePosition.x, conePosition.y, colorYellow, scaledConeRadius);
-        }
+    for (j = 0; j < noisyBlueCones.length; j++) {
+        let conePosition = noisyBlueCones[j];
+        drawCone(conePosition.x, conePosition.y, colorBlue, scaledConeRadius);
+    }
+    for (j = 0; j < noisyYellowCones.length; j++) {
+        let conePosition = noisyYellowCones[j];
+        drawCone(conePosition.x, conePosition.y, colorYellow, scaledConeRadius);
     }
 
     // Draw the cones of the potentialPathSegment.
@@ -812,7 +842,8 @@ function distanceBetweenPoints(point1, point2) {
 const holdingMouseButton = 0;
 const clickedMouseButton = 1;
 let mouseButtonPressedLastTick = false;
-var initialMousePosition = { x: -999999, y: -999999 };
+var prevMousePosition = { x: -999999, y: -999999 };
+let mouseMovedAtAnyPoint = false;
 let panningDif = null;
 /**
  * This function determines the mouse pointer position in the coordinates of the stage. It also
@@ -822,6 +853,16 @@ function getMouseButtonInput() {
 
     // Get the position of the mouse pointer on the stage.
     let mousePointerPosition = app.renderer.plugins.interaction.mouse.global;
+
+    // Determine if the mouse pointer moved since the last time this function was called.
+    let mouseMoved = false;
+    if (prevMousePosition.x != mousePointerPosition.x || prevMousePosition.y != mousePointerPosition.y) {
+        mouseMoved = true;
+        needToRedraw = true;
+    }
+    prevMousePosition.x = mousePointerPosition.x;
+    prevMousePosition.y = mousePointerPosition.y;
+    mouseMovedAtAnyPoint |= mouseMoved;
 
     // Check if the user is pressing the button this tick.
     let mouseButtonPressed = app.renderer.plugins.interaction.mouse.buttons;
@@ -833,12 +874,14 @@ function getMouseButtonInput() {
         // just pressed it.
         if (!mouseButtonPressedLastTick) {
 
+            mouseMovedAtAnyPoint = false;
+
             // If they clicked somewhere outside of the stage, we don't care. Don't do anything
             // else.
             if (pointerOutsideStage(mousePointerPosition)) {
                 return {
                     buttonAction: null,
-                    mousePointerPosition: null,
+                    mousePointerPosition: mousePointerPosition,
                     panningDif: null
                 };
             }
@@ -849,10 +892,6 @@ function getMouseButtonInput() {
                 x: worldContainer.x - mousePointerPosition.x,
                 y: worldContainer.y - mousePointerPosition.y
             };
-
-            // Save the position of the mouse at the initial button press.
-            initialMousePosition.x = mousePointerPosition.x;
-            initialMousePosition.y = mousePointerPosition.y;
 
             // Register that the mouse button was pressed in the last tick.
             mouseButtonPressedLastTick = true;
@@ -869,10 +908,9 @@ function getMouseButtonInput() {
         // user just released it.
         if (mouseButtonPressedLastTick) {
             mouseButtonPressedLastTick = false;
-            // If the mouse was moved from the position where it was when the user first pressed
-            // the mouse button, the user was holding the mouse button and dragging. If not, we
-            // don't care.
-            if (distanceBetweenPoints(mousePointerPosition, initialMousePosition) < 2) {
+            // A release of the mouse button only represents a click if the user did not move the
+            // mouse.
+            if (!mouseMovedAtAnyPoint) {
                 return {
                     buttonAction: clickedMouseButton,
                     mousePointerPosition: mousePointerPosition,
@@ -907,12 +945,92 @@ function getMousePointInGrid(mousePointerPosition) {
 function KeyPress(e) {
     var evtobj = e;
     if (evtobj.keyCode == 90 && evtobj.ctrlKey) {
-        if (pathSegments.length > 1) {
-            pathSegments.splice(-1);
-        }
-        if (!activelyDrawing) {
-            activelyDrawing = true;
-        }
+        undo();
     }
 }
 document.onkeydown = KeyPress;
+
+function undo() {
+    if (pathSegments.length > 1) {
+        let lastPathSegment = pathSegments.pop();
+        console.log(lastPathSegment.blueCones.length);
+        noisyBlueCones.splice(-lastPathSegment.blueCones.length);
+        noisyYellowCones.splice(-lastPathSegment.yellowCones.length);
+    }
+    if (!activelyDrawing) {
+        activelyDrawing = true;
+    }
+}
+
+function toggleNoisyCones() {
+    let button = document.getElementById("noisy-cone-btn");
+
+    if (button.classList.contains("btn-outline-secondary")) {
+        button.classList.remove("btn-outline-secondary");
+        button.classList.add("btn-primary")
+    } else {
+        button.classList.remove("btn-primary");
+        button.classList.add("btn-outline-secondary")
+    }
+}
+
+function clearTrack() {
+    let confirmClear = confirm("Clear the track? This action cannot be undone.");
+    if (confirmClear) {
+        pathSegments.splice(1, pathSegments.length - 1);
+    }
+    activelyDrawing = true;
+    needToRedraw = true;
+}
+
+let drawNoisyCones = false;
+function toggleNoisyCones() {
+    needToRedraw = true;
+    drawNoisyCones = !drawNoisyCones;
+
+    if (drawNoisyCones) {
+        // Clear the noisyCones array
+        noisyBlueCones = [];
+        noisyYellowCones = [];
+        // Iterate over the pathSegments and apply noise to the position of the cones before
+        // storing them in the noisyCones array.
+        for (i = 0; i < pathSegments.length; i++) {
+
+            let blueCones = pathSegments[i].blueCones;
+            for (j = 0; j < blueCones.length; j++) {
+                noisyBlueCones.push(addNoiseToPoint(blueCones[j]));
+            }
+
+            let yellowCones = pathSegments[i].yellowCones;
+            for (j = 0; j < yellowCones.length; j++) {
+                noisyYellowCones.push(addNoiseToPoint(yellowCones[j]));
+            }
+        }
+    } else {
+        // Clear the noisyCones array
+        noisyBlueCones = [];
+        noisyYellowCones = [];
+        // Just copy in the cones with no noise.
+        for (i = 0; i < pathSegments.length; i++) {
+
+            let blueCones = pathSegments[i].blueCones;
+            for (j = 0; j < blueCones.length; j++) {
+                noisyBlueCones.push(blueCones[j]);
+            }
+
+            let yellowCones = pathSegments[i].yellowCones;
+            for (j = 0; j < yellowCones.length; j++) {
+                noisyYellowCones.push(yellowCones[j]);
+            }
+        }
+    }
+}
+
+let noiseBase = 20;
+function addNoiseToPoint(point) {
+    let factorX = Math.floor(Math.random() * 2) - 1;
+    let noiseX = point.x + noiseBase * factorX;
+    let factorY = Math.floor(Math.random() * 2) - 1;
+    let noiseY = point.y + noiseBase * factorY;
+    return { x: noiseX, y: noiseY };
+}
