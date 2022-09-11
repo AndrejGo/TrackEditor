@@ -23,8 +23,7 @@ const originRadius = 6;
 var worldContainer;
 var pathSegments;
 var potentialPathSegment;
-var noisyBlueCones;
-var noisyYellowCones;
+var trackCones;
 var endOfTrack;
 var endOfTrackMarker;
 var activelyDrawing = true;
@@ -119,7 +118,9 @@ function appLoop() {
             9500 * worldContainer.scale._x + app.screen.height
         );
 
-    } else if (mouseButtonInput.buttonAction == clickedMouseButton) {
+        needToRedraw = false;
+
+    } else if (mouseButtonInput.buttonAction == clickedMouseButton && activelyDrawing) {
 
         // If the user clicked on the grid, they placed down the current potentialPathSegment and
         // we need to append it to the end of the pathSegments array. Only do this if the arc is
@@ -130,22 +131,22 @@ function appLoop() {
             if (drawNoisyCones) {
                 let blueCones = potentialPathSegment.blueCones;
                 for (j = 0; j < blueCones.length; j++) {
-                    noisyBlueCones.push(addNoiseToPoint(blueCones[j]));
+                    trackCones.blue.push(addNoiseToPoint(blueCones[j]));
                 }
 
                 let yellowCones = potentialPathSegment.yellowCones;
                 for (j = 0; j < yellowCones.length; j++) {
-                    noisyYellowCones.push(addNoiseToPoint(yellowCones[j]));
+                    trackCones.yellow.push(addNoiseToPoint(yellowCones[j]));
                 }
             } else {
                 let blueCones = potentialPathSegment.blueCones;
                 for (j = 0; j < blueCones.length; j++) {
-                    noisyBlueCones.push(blueCones[j]);
+                    trackCones.blue.push(blueCones[j]);
                 }
 
                 let yellowCones = potentialPathSegment.yellowCones;
                 for (j = 0; j < yellowCones.length; j++) {
-                    noisyYellowCones.push(yellowCones[j]);
+                    trackCones.yellow.push(yellowCones[j]);
                 }
             }
         }
@@ -162,8 +163,15 @@ function appLoop() {
         }
     }
 
-    // Draw the cones and the arcs that make up the track every tick.
-    if (activelyDrawing || needToRedraw) {
+    // We only redraw the track after certain events. This is an optimization step, since this app
+    // would otherwise occasionally freeze the browser. Events when we redraw:
+    //     - Zoom
+    //     - Mouse moved while actively drawing
+    //     - After undo
+    //     - After clear track
+    //     - After cone randomization
+    if (needToRedraw) {
+        console.log("Redrawing");
         needToRedraw = false;
         drawCones(pathSegments, potentialPathSegment);
         drawArcs(pathSegments, potentialPathSegment);
@@ -320,8 +328,7 @@ function setUpStart() {
     // Clear the pathSegments array, which contains all of the path segments that the user draws.
     // We use it to support undo's and to store cone positions.
     pathSegments = [];
-    noisyBlueCones = [];
-    noisyYellowCones = [];
+    trackCones = { yellow: [], blue: [] };
 
     // Create the initial path segment which runs through the center of the start/finish line, in
     // a north south direction from 1 m before the line to 1 m after the line.
@@ -355,16 +362,23 @@ function setUpStart() {
 
         yellowCones: [
             { color: colorYellow, x: 150, y: -100 },
-            { color: colorYellow, x: 150, y: 0 },
             { color: colorYellow, x: 150, y: 100 }
         ],
 
         blueCones: [
             { color: colorBlue, x: -150, y: -100 },
-            { color: colorBlue, x: -150, y: 0 },
             { color: colorBlue, x: -150, y: 100 }
         ]
     });
+
+    trackCones.blue = [
+        { x: -150, y: -100 },
+        { x: -150, y: 100 }
+    ];
+    trackCones.yellow = [
+        { x: 150, y: -100 },
+        { x: 150, y: 100 }
+    ];
 
     // Remember the point where the track ends so the user can close the loop by clicking on it.
     endOfTrack = { x: 0, y: 100 };
@@ -573,17 +587,17 @@ function preparePotentialPathSegment(mousePoint) {
  * potentialPathSegment. potentialPathSegment can be null, as can the blueCones and yellowCones
  * array inside of it.
  */
-function drawCones(pathSegments, potentialPathSegment) {
+function drawCones(potentialPathSegment) {
 
     conesGraphics.clear();
 
     // Draw cones of the segments that were already placed.
-    for (j = 0; j < noisyBlueCones.length; j++) {
-        let conePosition = noisyBlueCones[j];
+    for (j = 0; j < trackCones.blue.length; j++) {
+        let conePosition = trackCones.blue[j];
         drawCone(conePosition.x, conePosition.y, colorBlue, scaledConeRadius);
     }
-    for (j = 0; j < noisyYellowCones.length; j++) {
-        let conePosition = noisyYellowCones[j];
+    for (j = 0; j < trackCones.yellow.length; j++) {
+        let conePosition = trackCones.yellow[j];
         drawCone(conePosition.x, conePosition.y, colorYellow, scaledConeRadius);
     }
 
@@ -858,7 +872,8 @@ function getMouseButtonInput() {
     let mouseMoved = false;
     if (prevMousePosition.x != mousePointerPosition.x || prevMousePosition.y != mousePointerPosition.y) {
         mouseMoved = true;
-        needToRedraw = true;
+        // If the mouse moved, we need to trigger a redraw if we are actively drawing.
+        needToRedraw = activelyDrawing;
     }
     prevMousePosition.x = mousePointerPosition.x;
     prevMousePosition.y = mousePointerPosition.y;
@@ -903,6 +918,7 @@ function getMouseButtonInput() {
             panningDif: panningDif
         };
     } else {
+
         // The mouse button is not pressed. If it was also not pressed in the last tick, we don't
         // care and we do nothing. If the button was pressed in the last tick, it means that the
         // user just released it.
@@ -950,21 +966,53 @@ function KeyPress(e) {
 }
 document.onkeydown = KeyPress;
 
+/**
+ * The user pressed Ctrl+Z or clicked on the undo button. Remove the last path segment.
+ */
 function undo() {
+    // Don't remove the first path segment.
     if (pathSegments.length > 1) {
+        // Remove the lastPathSegment from the pathSegments array.
         let lastPathSegment = pathSegments.pop();
-        console.log(lastPathSegment.blueCones.length);
-        noisyBlueCones.splice(-lastPathSegment.blueCones.length);
-        noisyYellowCones.splice(-lastPathSegment.yellowCones.length);
+        // Remove the cones belonging to the lastPathSegment from the arrays in trackCones.
+        trackCones.blue.splice(-lastPathSegment.blueCones.length);
+        trackCones.yellow.splice(-lastPathSegment.yellowCones.length);
     }
+    // If the user undid the last path segment after completing the circuit, we need to start
+    // actively drawing again.
     if (!activelyDrawing) {
         activelyDrawing = true;
     }
+    // We always need to redraw the track after an undo.
+    needToRedraw = true;
 }
 
-function toggleNoisyCones() {
-    let button = document.getElementById("noisy-cone-btn");
+/**
+ * Remove all path segments except for the first one.
+ */
+function clearTrack() {
+    // Confirm the action with a dialogue box.
+    let confirmClear = confirm("Clear the track? This action cannot be undone.");
+    if (confirmClear) {
+        // Remove all path segments except for the first one. Remove all cones from the noisy cones
+        // arrays. We always actively draw after clearing the track.
+        pathSegments.splice(1, pathSegments.length - 1);
+        trackCones.blue = [];
+        trackCones.yellow = [];
+        activelyDrawing = true;
+        needToRedraw = true;
+    }
+}
 
+/**
+ * This function takes the cone positions from the path segments and then either copies them
+ * directly into trackCones or applies some noise before doing so.
+ */
+let drawNoisyCones = false;
+function toggleNoisyCones() {
+
+    // Change the appearance of the button to indicate if the cone randomization is on or off.
+    let button = document.getElementById("noisy-cone-btn");
     if (button.classList.contains("btn-outline-secondary")) {
         button.classList.remove("btn-outline-secondary");
         button.classList.add("btn-primary")
@@ -972,60 +1020,45 @@ function toggleNoisyCones() {
         button.classList.remove("btn-primary");
         button.classList.add("btn-outline-secondary")
     }
-}
 
-function clearTrack() {
-    let confirmClear = confirm("Clear the track? This action cannot be undone.");
-    if (confirmClear) {
-        pathSegments.splice(1, pathSegments.length - 1);
-    }
-    activelyDrawing = true;
+    // We always need to redraw after toggling noisy cones.
     needToRedraw = true;
-}
 
-let drawNoisyCones = false;
-function toggleNoisyCones() {
-    needToRedraw = true;
+    // Clear the noisyCones array
+    trackCones.blue = [];
+    trackCones.yellow = [];
+    // Toggle drawNoisyCones
     drawNoisyCones = !drawNoisyCones;
 
-    if (drawNoisyCones) {
-        // Clear the noisyCones array
-        noisyBlueCones = [];
-        noisyYellowCones = [];
-        // Iterate over the pathSegments and apply noise to the position of the cones before
-        // storing them in the noisyCones array.
-        for (i = 0; i < pathSegments.length; i++) {
+    // Go over all of the segments.
+    for (i = 0; i < pathSegments.length; i++) {
 
-            let blueCones = pathSegments[i].blueCones;
-            for (j = 0; j < blueCones.length; j++) {
-                noisyBlueCones.push(addNoiseToPoint(blueCones[j]));
-            }
-
-            let yellowCones = pathSegments[i].yellowCones;
-            for (j = 0; j < yellowCones.length; j++) {
-                noisyYellowCones.push(addNoiseToPoint(yellowCones[j]));
+        // Get and array of points representing the blue cones of the segment.
+        let blueCones = pathSegments[i].blueCones;
+        for (j = 0; j < blueCones.length; j++) {
+            // For each cone, if we need to draw noisy cones, apply noise and add it to trackCones.
+            // Never apply noise to the cones of the first segment.
+            if (drawNoisyCones && i != 0) {
+                trackCones.blue.push(addNoiseToPoint(blueCones[j]));
+            } else {
+                trackCones.blue.push(blueCones[j]);
             }
         }
-    } else {
-        // Clear the noisyCones array
-        noisyBlueCones = [];
-        noisyYellowCones = [];
-        // Just copy in the cones with no noise.
-        for (i = 0; i < pathSegments.length; i++) {
 
-            let blueCones = pathSegments[i].blueCones;
-            for (j = 0; j < blueCones.length; j++) {
-                noisyBlueCones.push(blueCones[j]);
+        // Same as for blue cones.
+        let yellowCones = pathSegments[i].yellowCones;
+        for (j = 0; j < yellowCones.length; j++) {
+            if (drawNoisyCones && i != 0) {
+                trackCones.yellow.push(addNoiseToPoint(yellowCones[j]));
+            } else {
+                trackCones.blue.push(yellowCones[j]);
             }
 
-            let yellowCones = pathSegments[i].yellowCones;
-            for (j = 0; j < yellowCones.length; j++) {
-                noisyYellowCones.push(yellowCones[j]);
-            }
         }
     }
 }
 
+// Applies noise in the range of [-noiseBase, noiseBase] to the x and y coordinates of the point.
 let noiseBase = 20;
 function addNoiseToPoint(point) {
     let factorX = Math.floor(Math.random() * 2) - 1;
