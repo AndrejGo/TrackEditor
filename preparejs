@@ -1,0 +1,3 @@
+#!/bin/bash
+
+python3 -m jsmin cone.js geofunc.js path.js track.js ui.js world.js code.js > allcode.js
