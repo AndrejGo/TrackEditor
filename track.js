@@ -34,9 +34,11 @@ class Track {
      */
     updatePotentialSegment(mousePoint) {
 
-        // Determine the start point and tangent.
+        // Determine the start point and tangent. Take the initial values to start.
         let tangentLine = this.initialDirection;
         let start = this.start;
+        // If the user already placed some path segments, take the last one and update the start
+        // point and tangent line.
         if (this.segments.length > 0) {
             let prevCenterLineArc = this.segments[this.segments.length - 1].centerLineArc;
             tangentLine = prevCenterLineArc.endTangentLine;
@@ -55,7 +57,9 @@ class Track {
      * Draw the path segments the user already placed.
      */
     drawPlacedSegments(graphicsObject, scalingFactor) {
+        // Clear any previously drawn elements.
         graphicsObject.clear();
+        // Draw each placed segment.
         this.segments.forEach((segment) => {
             segment.draw(graphicsObject, scalingFactor, this.noisyCones);
         });
@@ -97,12 +101,14 @@ class Track {
         W.needToRedraw = true;
 
         if (this.noisyCones) {
+            // Just call applyNoise() of each cone of each segment.
             this.segments.forEach((segment) => {
                 segment.cones.forEach((cone) => {
                     cone.applyNoise();
                 });
             });
         } else {
+            // Just call removeNoise() of each cone of each segment.
             this.segments.forEach((segment) => {
                 segment.cones.forEach((cone) => {
                     cone.removeNoise();
@@ -121,6 +127,7 @@ class Track {
         if (!this.activelyDrawing) {
             this.activelyDrawing = true;
         }
+        // We need to redraw the track after each undo to remove the element we deleted.
         W.needToRedraw = true;
     }
 }

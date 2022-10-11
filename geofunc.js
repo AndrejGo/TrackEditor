@@ -265,10 +265,17 @@ class Arc {
         }
     }
 
+    /**
+     * Calculate the length of the arc.
+     */
     length() {
         return this.angle() * this.radius;
     }
 
+    /**
+     * Make the right boundary of this arc. The right boundary is always yellow, but has a smaller
+     * or larger radius depending on whether it is a right or left turn.
+     */
     rightBoundary() {
         let a = this.copy();
         if (a.anticlockwise) {
@@ -280,6 +287,10 @@ class Arc {
         return a;
     }
 
+    /**
+     * Make the left boundary of this arc. The left boundary is always blue, but has a smaller
+     * or larger radius depending on whether it is a right or left turn.
+     */
     leftBoundary() {
         let a = this.copy();
         if (a.anticlockwise) {
@@ -291,12 +302,19 @@ class Arc {
         return a;
     }
 
+    /**
+     * Draw the arc in the supplied graphicsObject.
+     */
     draw(graphicsObject, scalingFactor) {
+        // Move to the start of the arc.
         graphicsObject.moveTo(
             this.center.x + Math.cos(this.startAngle) * (this.radius),
             this.center.y + Math.sin(this.startAngle) * (this.radius)
         );
+        // Set the width and color of the arc line.
         graphicsObject.lineStyle({ width: this.width / scalingFactor, color: this.color, alpha: 1 });
+        // The process of calculating the arc basically produced all of the values we need to
+        // pass to the arc() function.
         graphicsObject.arc(this.center.x, this.center.y, this.radius, this.startAngle, this.endAngle,
             this.anticlockwise);
     }
