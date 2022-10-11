@@ -103,7 +103,7 @@ class UserInterface {
                 // We define a mouse click as an event where the user presses the mouse button,
                 // DOESN'T MOVE THE MOUSE and then releases the mouse button. Here we check if the
                 // mouse pointer is exactly where it was when the mouse press hapened. 
-                if (mousePosition.distanceTo(this.mousePressLocation) < 1) {
+                if (mousePosition.distanceTo(this.mousePressLocation) < 1 && !this.#mouseOutsideStage(mousePosition)) {
                     return {
                         hold: false,
                         click: true,
