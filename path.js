@@ -100,9 +100,15 @@ class PathSegment {
         // Start by drawing each cone of the path segment.
         this.cones.forEach((cone) => { cone.draw(graphicsObject, scalingFactor, noisyCones) });
         // Draw the green centerline arc.
-        this.centerLineArc.draw(graphicsObject, scalingFactor);
+        if(this.centerLineArc != null) {
+            this.centerLineArc.draw(graphicsObject, scalingFactor);
+        }
         // Draw the right and left boundaries of the path segment.
-        this.rightBoundaryArc.draw(graphicsObject, scalingFactor);
-        this.leftBoundaryArc.draw(graphicsObject, scalingFactor);
+        if(this.rightBoundaryArc != null) {
+            this.rightBoundaryArc.draw(graphicsObject, scalingFactor);
+        }
+        if(this.leftBoundaryArc != null) {
+            this.leftBoundaryArc.draw(graphicsObject, scalingFactor);
+        }
     }
 }

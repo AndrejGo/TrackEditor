@@ -89,6 +89,7 @@ function clearTrack() {
     let confirmClear = confirm("Clear the track? This action cannot be undone.");
     if (confirmClear) {
         t = new Track(new Point(0, -100), new Point(0, 100), Line.vertical);
+        W.wipGraphics.clear();
         W.needToRedraw = true;
     }
 }
@@ -114,45 +115,146 @@ function toggleNoisyCones() {
 
 function placeSkidpad() {
 
-    // Get the parameters of the skidpad track.
-    let leftRadius = 100 * Number(document.getElementById("left-radius").value);
-    let rightRadius = 100 * Number(document.getElementById("right-radius").value);
-    let startStraight = 100 * Number(document.getElementById("start-straight").value);
-    let finishStraight = 100 * Number(document.getElementById("finish-straight").value);
-
-    // Only proceed if the user specified all of the parameters.
-    if (leftRadius == 0 || rightRadius == 0 || startStraight == 0 || finishStraight == 0) {
-        return;
-    }
-
-    // Placing the skidpad always clears whatever track was previously there.
+    // Placing the skidpad always clears whatever track was previously there. We also want to
+    // disable drawing.
     clearTrack();
-    activelyDrawing = false;
+    t.initialCones = [];
+    t.activelyDrawing = false;
 
     // Construct 4 segments, the start straight, right loop, left loop and the finish line.
 
     // Start straight
-    let numStartStraightCones = Math.ceil(startStraight / 500);
-    let distanceBetweenCones = Math.round(startStraight / numStartStraightCones);
-    for (i = 0; i <= numStartStraightCones; i++) {
-        // Yellow
-        let yellowCone = { x: 150, y: -i * distanceBetweenCones };
-        cones.yellow.push(yellowCone);
-    }
+    t.segments.push(
+        new PathSegment(
+            null, null, null,
+            [
+                new Cone(new Point(-150, 0), Cone.orange, Cone.small),
+                new Cone(new Point(150, 0), Cone.orange, Cone.small),
+                new Cone(new Point(-150, -400), Cone.orange, Cone.small),
+                new Cone(new Point(150, -400), Cone.orange, Cone.small)
+            ]
+        )
+    );
 
-    // Right circle
-    let angle = Math.acos((rightRadius - 300) / rightRadius);
-    let rightCircleCenter = { x: rightRadius - 150, y: - startStraight - Math.sin(angle) * rightRadius };
-    cones.yellow.push(rightCircleCenter);
+    // Large orange cones
+    t.segments.push(
+        new PathSegment(
+            null, null, null,
+            [
+                new Cone(new Point(-150, -1530), Cone.orange, Cone.large),
+                new Cone(new Point(150, -1530), Cone.orange, Cone.large),
+                new Cone(new Point(-150, -1470), Cone.orange, Cone.large),
+                new Cone(new Point(150, -1470), Cone.orange, Cone.large)
+            ]
+        )
+    );
 
-    arcLength = (2 * Math.PI - 2 * Math.abs(angle)) * rightRadius;
-    numCones = Math.ceil(arcLength / 500);
-    diff = (2 * Math.PI - 2 * Math.abs(angle)) / numCones;
+    // End straight
+    t.segments.push(
+        new PathSegment(
+            null, null, null,
+            [
+                new Cone(new Point(-150, -4000), Cone.orange, Cone.small),
+                new Cone(new Point(-50, -4000), Cone.orange, Cone.small),
+                new Cone(new Point(50, -4000), Cone.orange, Cone.small),
+                new Cone(new Point(150, -4000), Cone.orange, Cone.small),
 
-    for (coneAngle = Math.PI - angle; coneAngle >= - Math.PI + angle; coneAngle -= diff) {
-        cones.yellow.push({
-            x: Math.cos(coneAngle) * rightRadius + rightCircleCenter.x,
-            y: Math.sin(coneAngle) * rightRadius + rightCircleCenter.y
-        });
-    }
+                new Cone(new Point(-150, -3500), Cone.orange, Cone.small),
+                new Cone(new Point(150, -3500), Cone.orange, Cone.small),
+                new Cone(new Point(-150, -3000), Cone.orange, Cone.small),
+                new Cone(new Point(150, -3000), Cone.orange, Cone.small)
+            ]
+        )
+    );
+
+    let lineWidth = 3;
+    let rightCenter = new Point(912.5, -1500);
+    let leftCenter = new Point(-912.5, -1500);
+    let innerRadius = 762.5;
+    let outerRadius = 1062.5;
+    let innerAngleArray = [
+        0, 0.125, 0.25, 0.375, 0.5, 0.625, 0.75, 0.875, 1, 1.125, 1.25, 1.375, 1.5, 1.625, 1.75, 1.875
+    ];
+    let outerAngleArray = [
+        0, 0.125, 0.25, 0.375, 0.5, 0.625, 0.71, 1.29, 1.375, 1.5, 1.625, 1.75, 1.875
+    ];
+    let rigthInnerCones = innerAngleArray.map(
+        x => new Cone(
+            new Point(rightCenter.x + Math.cos(x * Math.PI) * innerRadius, rightCenter.y + Math.sin(x * Math.PI) * innerRadius),
+            Cone.yellow, Cone.small
+        )
+    );
+    let rigthOuterCones = outerAngleArray.map(
+        x => new Cone(
+            new Point(rightCenter.x + Math.cos(x * Math.PI) * outerRadius, rightCenter.y + Math.sin(x * Math.PI) * outerRadius),
+            Cone.blue, Cone.small
+        )
+    );
+    let leftInnerCones = innerAngleArray.map(
+        x => new Cone(
+            new Point(leftCenter.x + Math.cos(x * Math.PI) * innerRadius, leftCenter.y + Math.sin(x * Math.PI) * innerRadius),
+            Cone.blue, Cone.small
+        )
+    );
+    let leftOuterCones = outerAngleArray.map(
+        x => new Cone(
+            new Point(leftCenter.x + Math.cos((1-x) * Math.PI) * outerRadius, leftCenter.y + Math.sin(x * Math.PI) * outerRadius),
+            Cone.yellow, Cone.small
+        )
+    );
+    
+
+    // Right loop
+    t.segments.push(
+        new PathSegment(
+            null,
+            new Arc(rightCenter, innerRadius, Math.PI + 0.001, Math.PI, false, Arc.yellow,
+                    null, null, lineWidth),
+            null,
+            rigthInnerCones
+        )
+    );
+    t.segments.push(
+        new PathSegment(
+            null,
+            new Arc(rightCenter, outerRadius, 1.3 * Math.PI, 0.7 * Math.PI, false, Arc.blue,
+                    null, null, lineWidth),
+            null,
+            rigthOuterCones
+        )
+    );
+    t.segments.push(
+        new PathSegment(
+            null,
+            new Arc(
+                new Point(-912.5, -1500),
+                762.5,
+                0.001,
+                0,
+                false,
+                Arc.blue,
+                null,
+                null,
+                5
+            ), null,
+            leftInnerCones
+        )
+    );
+    t.segments.push(
+        new PathSegment(
+            null,
+            new Arc(
+                new Point(-912.5, -1500),
+                1062.5,
+                1.7 * Math.PI,
+                0.3 * Math.PI,
+                true,
+                Arc.yellow,
+                null,
+                null,
+                5
+            ), null,
+            leftOuterCones
+        )
+    );
 }
