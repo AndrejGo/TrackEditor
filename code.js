@@ -258,3 +258,77 @@ function placeSkidpad() {
         )
     );
 }
+
+function placeAcceleration() {
+
+    // Placing the acceleration always clears whatever track was previously there. We also want to
+    // disable drawing.
+    clearTrack();
+    t.initialCones = [];
+    t.activelyDrawing = false;
+
+    let coneArray = [
+        new Cone(new Point(-150, 7470), Cone.orange, Cone.large),
+        new Cone(new Point(150, 7470), Cone.orange, Cone.large),
+        new Cone(new Point(-150, 7530), Cone.orange, Cone.large),
+        new Cone(new Point(150, 7530), Cone.orange, Cone.large)
+    ];
+
+    for(let i = -14; i < 15; i++) {
+        if(i == 0) {
+            continue;
+        }
+        let colorLeft = Cone.blue;
+        let colorRight = Cone.yellow;
+        if(i < 0) {
+            colorLeft = Cone.orange;
+            colorRight = Cone.orange;
+        }
+        coneArray.push(
+            new Cone(new Point(-150, i * 500), colorLeft, Cone.small)
+        );
+        coneArray.push(
+            new Cone(new Point(150, i * 500), colorRight, Cone.small)
+        );
+    }
+
+    coneArray.push(
+        new Cone(new Point(-150, -30), Cone.orange, Cone.large)
+    );
+    coneArray.push(
+        new Cone(new Point(150, -30), Cone.orange, Cone.large)
+    );
+    coneArray.push(
+        new Cone(new Point(-150, 30), Cone.orange, Cone.large)
+    );
+    coneArray.push(
+        new Cone(new Point(150, 30), Cone.orange, Cone.large)
+    );
+
+    coneArray.push(
+        new Cone(new Point(-150, -7500), Cone.orange, Cone.large)
+    );
+    coneArray.push(
+        new Cone(new Point(-90, -7500), Cone.orange, Cone.large)
+    );
+    coneArray.push(
+        new Cone(new Point(-30, -7500), Cone.orange, Cone.large)
+    );
+    coneArray.push(
+        new Cone(new Point(30, -7500), Cone.orange, Cone.large)
+    );
+    coneArray.push(
+        new Cone(new Point(90, -7500), Cone.orange, Cone.large)
+    );
+    coneArray.push(
+        new Cone(new Point(150, -7500), Cone.orange, Cone.large)
+    );
+
+    // Single straight cone
+    t.segments.push(
+        new PathSegment(
+            null, null, null,
+            coneArray
+        )
+    );
+}
